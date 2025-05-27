@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result as SqliteResult, Transaction};
 use std::collections::HashMap;
 
-const CURRENT_DB_VERSION: i32 = 2;
+const CURRENT_DB_VERSION: i32 = 1;
 
 fn version_table_exists(tx: &Transaction) -> SqliteResult<bool> {
     let count: i32 = tx.query_row(
