@@ -32,7 +32,10 @@ pub fn run() {
             features::server::update_server,
             features::server::delete_server,
             features::server::get_servers,
-            features::server::update_settings,
+            features::server::try_connect_to_server,
+            features::server::connect_with_password,
+            features::server::disconnect_from_server,
+            features::server::run_cmd,
 
             features::ssh_key::add_ssh_key,
             features::ssh_key::delete_ssh_key,

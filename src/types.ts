@@ -32,3 +32,5 @@ export type Setting = {
 };
 
 export type Settings = Setting[];
+
+export type ServerConnectionStatus = 'connected' | 'disconnected' | 'connecting';

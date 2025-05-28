@@ -1,6 +1,9 @@
+import { invoke } from '@tauri-apps/api/core';
+import { useState } from 'react';
 import { usePageContext } from '@/components/providers/page';
-import { useServerContext } from '@/components/providers/server';
+import {ConnectionStatuses, useServerContext} from '@/components/providers/server';
 import { useGlobalState } from '@/components/providers/global-state.tsx';
+import { ConnectButton } from '@/components/features/server/connect-button';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -16,54 +19,53 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { MoreHorizontal, EyeIcon, EyeOffIcon } from "lucide-react";
+import {toast} from "sonner";
+import { EditServerDialog } from '@/components/features/server/edit-server-dialog';
 
 export default function ServersPage(){
-    const { servers, setServers, loading, error, visibleIpMap, toggleIpVisibility } = useGlobalState();
+    const { servers, loading, error, visibleIpMap, toggleIpVisibility, fetchServers } = useGlobalState();
     const { setCurrentPage } = usePageContext();
-    const { setSelectedServerId, setServerData } = useServerContext();
-
-    const handleViewDetails = (serverId: number) => {
-        const server = servers.find(s => s.id === serverId) || null;
-
-        if (server) {
-            setSelectedServerId(serverId);
-            setServerData(server);
-            setCurrentPage('server');
-        }
-    };
+    const { connectionStatus, connectedServer, setConnectionStatus, setConnectedServer } = useServerContext();
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [serverToDelete, setServerToDelete] = useState<number | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [serverToEdit, setServerToEdit] = useState<number | null>(null);
 
     const handleManageSettings = (serverId: number) => {
-        const server = servers.find(s => s.id === serverId) || null;
-
-        if (server) {
-            setSelectedServerId(serverId);
-            setServerData(server);
-            setCurrentPage('server');
-        }
+        setServerToEdit(serverId);
+        setEditDialogOpen(true);
     };
 
-    const handleConnect = (serverId: number) => {
-        // This is a placeholder for the connect functionality
-        console.log(`Connecting to server with ID: ${serverId}`);
+    const handleDeleteClick = (serverId: number) => {
+        setServerToDelete(serverId);
+        setDeleteError(null);
+        setDeleteDialogOpen(true);
     };
 
-    const handleDelete = async (serverId: number) => {
-        if (!window.confirm("Are you sure you want to delete this server?")) {
-            return;
-        }
+    const handleDeleteConfirm = async () => {
+        if (serverToDelete === null) return;
 
         try {
-            // This is a placeholder for the delete functionality
-            // In a real implementation, this would call the backend to delete the server
-            console.log(`Deleting server with ID: ${serverId}`);
-            // await invoke('delete_server', { id: serverId });
+            await invoke('delete_server', { id: serverToDelete });
+            await fetchServers();
 
-            // Update the local state to remove the deleted server
-            setServers(servers.filter(s => s.id !== serverId));
+            setDeleteDialogOpen(false);
+            setServerToDelete(null);
+            setDeleteError(null);
+            toast.success('Server deleted successfully.');
         } catch (err) {
             console.error('Failed to delete server:', err);
-            alert('Failed to delete server. Please try again.');
+            setDeleteError(err instanceof Error ? err.message : 'Failed to delete server. Please try again.');
         }
     };
 
@@ -88,6 +90,8 @@ export default function ServersPage(){
         );
     }
 
+    const serverToDeleteData = serverToDelete !== null ? servers.find(s => s.id === serverToDelete) : null;
+
     return (
         <div className="container mx-auto py-4">
             <Table>
@@ -98,6 +102,7 @@ export default function ServersPage(){
                         <TableHead>IP Address</TableHead>
                         <TableHead>Port</TableHead>
                         <TableHead>Username</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -130,14 +135,24 @@ export default function ServersPage(){
                             </TableCell>
                             <TableCell>{server.port}</TableCell>
                             <TableCell>{server.username}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center">
+                                    <span className={`inline-block w-3 h-3 rounded-full mr-2 ${
+                                        connectedServer?.id === server.id && connectionStatus === 'connected' ? 'bg-green-500' : 
+                                        connectedServer?.id === server.id && connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                                    }`}></span>
+                                    <span>
+                                        {connectedServer?.id === server.id && connectionStatus === 'connected' ? 'Connected' :
+                                         connectedServer?.id === server.id && connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+                                    </span>
+                                </div>
+                            </TableCell>
                             <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
-                                    <Button
-                                        size="sm"
-                                        onClick={() => server.id && handleConnect(server.id)}
-                                    >
-                                        Connect
-                                    </Button>
+                                    <ConnectButton
+                                        server={server}
+                                        variant="default"
+                                    />
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" size="sm">
@@ -152,7 +167,7 @@ export default function ServersPage(){
                                                 Edit
                                             </DropdownMenuItem>
                                             <DropdownMenuItem 
-                                                onClick={() => server.id && handleDelete(server.id)}
+                                                onClick={() => server.id && handleDeleteClick(server.id)}
                                                 className="text-red-600"
                                             >
                                                 Delete
@@ -165,6 +180,52 @@ export default function ServersPage(){
                     ))}
                 </TableBody>
             </Table>
+
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Server</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete the server "{serverToDeleteData?.name}"? 
+                            This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {deleteError && (
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                            <strong className="font-bold">Error: </strong>
+                            <span className="block sm:inline">{deleteError}</span>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setDeleteDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="destructive" 
+                            onClick={handleDeleteConfirm}
+                        >
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {serverToEdit !== null && (
+                <EditServerDialog
+                    open={editDialogOpen}
+                    onOpenChange={setEditDialogOpen}
+                    server={servers.find(s => s.id === serverToEdit) || servers[0]}
+                    onSuccess={() => {
+                        setServerToEdit(null);
+                        fetchServers();
+                    }}
+                />
+            )}
         </div>
     );
 }

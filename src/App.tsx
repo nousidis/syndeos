@@ -8,6 +8,7 @@ import { GlobalStateProvider } from "@/components/providers/global-state.tsx";
 import { ServerProvider } from "@/components/providers/server.tsx";
 import { ThemeProvider } from "@/components/providers/theme.tsx";
 import { SettingsProvider } from "@/components/providers/settings.tsx";
+import { ConnectionDetails } from "@/components/features/server/connection-details.tsx";
 import "./App.css";
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
                                 <AppSidebar />
                                 <MainContent />
                             </SidebarProvider>
+                            <ConnectionDetails />
                         </ServerProvider>
                     </GlobalStateProvider>
                 </PageProvider>

@@ -1,6 +1,13 @@
 use rusqlite::{params, Connection};
 use super::model::Server;
-use super::service;
+use ssh2::{Session, DisconnectCode};
+use std::net::TcpStream;
+use std::path::Path;
+use std::sync::Mutex;
+use std::io::Read;
+use once_cell::sync::Lazy;
+
+static ACTIVE_SESSION: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
 
 pub fn add_server(conn: &Connection, server: Server) -> Result<Server, String> {
     let now = chrono::Local::now().to_rfc3339();
@@ -25,7 +32,8 @@ pub fn add_server(conn: &Connection, server: Server) -> Result<Server, String> {
         ],
     ).map_err(|e| e.to_string())?;
 
-    service::get_server(&conn, conn.last_insert_rowid())
+    // Assuming service::get_server is defined elsewhere or this refers to the get_server in this file
+    self::get_server(&conn, conn.last_insert_rowid())
 }
 
 pub fn get_server(conn: &Connection, id: i64) -> Result<Server, String> {
@@ -129,21 +137,146 @@ pub fn delete_server(conn: &Connection, id: i64) -> Result<(), String> {
     Ok(())
 }
 
-pub fn update_settings(conn: &Connection, id: i64, settings: serde_json::Value) -> Result<(), String> {
-    let now = chrono::Local::now().to_rfc3339();
-    let settings_json = serde_json::to_string(&settings).unwrap_or_else(|_| "{}".to_string());
+pub fn connect_with_ssh_key(server: &Server, ssh_key_path: &str) -> Result<Session, String> {
+    let tcp = TcpStream::connect(format!("{}:{}", server.hostname, server.port))
+        .map_err(|e| format!("Failed to connect to server: {}", e))?;
 
-    conn.execute(
-        "UPDATE servers SET
-         settings = ?1,
-         updated_at = ?2
-         WHERE id = ?3",
-        params![
-            settings_json,
-            now,
-            id
-        ],
-    ).map_err(|e| e.to_string())?;
+    let mut sess = Session::new()
+        .map_err(|e| format!("Failed to create SSH session: {}", e))?;
+    sess.set_tcp_stream(tcp);
+    sess.handshake().map_err(|e| format!("SSH handshake failed: {}", e))?;
 
-    Ok(())
+    let path = Path::new(ssh_key_path);
+    sess.userauth_pubkey_file(&server.username, None, path, None)
+        .map_err(|e| format!("SSH key authentication failed: {}", e))?;
+
+    if !sess.authenticated() {
+        return Err("Authentication failed".to_string());
+    }
+
+    Ok(sess)
+}
+
+pub fn connect_with_password(server: &Server, password: &str) -> Result<Session, String> {
+    let tcp = TcpStream::connect(format!("{}:{}", server.hostname, server.port))
+        .map_err(|e| format!("Failed to connect to server: {}", e))?;
+
+    let mut sess = Session::new()
+        .map_err(|e| format!("Failed to create SSH session: {}", e))?;
+    sess.set_tcp_stream(tcp);
+    sess.handshake().map_err(|e| format!("SSH handshake failed: {}", e))?;
+
+    sess.userauth_password(&server.username, password)
+        .map_err(|e| format!("Password authentication failed: {}", e))?;
+
+    if !sess.authenticated() {
+        return Err("Authentication failed".to_string());
+    }
+    
+    Ok(sess)
+}
+
+pub fn get_ssh_key_path(conn: &Connection, ssh_key_id: i64) -> Result<String, String> {
+    conn.query_row(
+        "SELECT path FROM ssh_keys WHERE id = ?1",
+        params![ssh_key_id],
+        |row| row.get(0)
+    ).map_err(|e| format!("Failed to get SSH key path: {}", e))
+}
+
+pub fn try_connect_to_server(conn: &Connection, server: &Server) -> Result<(), String> {
+    let session_result = if let Some(ssh_key_id) = server.ssh_key_id {
+        match get_ssh_key_path(conn, ssh_key_id) {
+            Ok(ssh_key_path) => {
+                let substr = ".pub";
+                let private_key_path = ssh_key_path.replace(substr, "");
+                connect_with_ssh_key(server, &private_key_path)
+            },
+            Err(e) => Err(format!("Failed to get SSH key: {}", e))
+        }
+    } else {
+        Err("No SSH key set for this server, and password flow not initiated from here.".to_string())
+    };
+
+    match session_result {
+        Ok(session) => {
+            let mut active_session_guard = ACTIVE_SESSION.lock().map_err(|_| "Failed to acquire session lock for connect".to_string())?;
+            *active_session_guard = Some(session);
+            Ok(())
+        }
+        Err(e) => Err(e)
+    }
+}
+
+pub fn disconnect_from_server() -> Result<(), String> {
+    let mut active_session_guard = ACTIVE_SESSION.lock().map_err(|_| "Failed to acquire session lock for disconnect".to_string())?;
+
+    if let Some(session) = active_session_guard.take() { 
+        match session.disconnect(Some(DisconnectCode::ByApplication), "User initiated disconnect", Some("")) {
+            Ok(_) => {
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("Failed to gracefully disconnect SSH session: {}. Session cleared.", e);
+                Err(format!("SSH disconnect call failed: {}", e))
+            }
+        }
+    } else {
+        Err("No active session to disconnect.".to_string())
+    }
+}
+
+pub fn run_cmd(command: &str) -> Result<String, String> {
+    let mut active_session_guard = ACTIVE_SESSION.lock().map_err(|_| "Failed to acquire session lock for command execution".to_string())?;
+
+    if let Some(session) = active_session_guard.as_mut() {
+        if !session.authenticated() {
+            return Err("Session is not authenticated.".to_string());
+        }
+
+        let mut channel = match session.channel_session() {
+            Ok(ch) => ch,
+            Err(e) => return Err(format!("Failed to open SSH channel: {}", e)),
+        };
+
+        if let Err(e) = channel.exec(command) {
+            return Err(format!("Failed to execute command '{}': {}", command, e));
+        }
+
+        let mut output = String::new();
+        if let Err(e) = channel.read_to_string(&mut output) {
+            eprintln!("Warning: Failed to read command output: {}", e);
+        }
+
+        let mut stderr_output = String::new();
+        if let Err(e) = channel.stderr().read_to_string(&mut stderr_output) {
+            eprintln!("Warning: Failed to read command stderr: {}", e);
+        }
+
+        if !stderr_output.is_empty() {
+            output.push_str("\n--- STDERR ---\n");
+            output.push_str(&stderr_output);
+        }
+
+        match channel.wait_close() {
+            Ok(_) => {},
+            Err(e) => eprintln!("Warning: Error during channel close: {}", e),
+        }
+
+        let exit_status = match channel.exit_status() {
+            Ok(status) => status,
+            Err(e) => {
+                return Err(format!("Failed to get command exit status: {}", e));
+            }
+        };
+
+        if exit_status == 0 {
+            Ok(output)
+        } else {
+            Err(format!("Command '{}' exited with status {}.\nOutput:\n{}\nStderr:\n{}", command, exit_status, output, stderr_output))
+        }
+
+    } else {
+        Err("No active SSH session found.".to_string())
+    }
 }
