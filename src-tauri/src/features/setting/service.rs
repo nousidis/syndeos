@@ -45,7 +45,7 @@ pub fn get_setting(conn: Connection, key: String) -> Result<String, String> {
 }
 
 pub fn get_settings(conn: Connection) -> Result<Vec<Setting>, String> {
-    let mut stmt = conn.prepare("SELECT id, key, value, value_type FROM settings")
+    let mut stmt = conn.prepare("SELECT id, key, value FROM settings")
         .map_err(|e| e.to_string())?;
 
     let settings_iter = stmt.query_map([], |row| {
@@ -53,7 +53,6 @@ pub fn get_settings(conn: Connection) -> Result<Vec<Setting>, String> {
             id: Some(row.get(0)?),
             key: row.get(1)?,
             value: row.get(2)?,
-            value_type: row.get(3)?,
         })
     }).map_err(|e| e.to_string())?;
 

@@ -23,7 +23,7 @@ Syndeos is built using modern web and desktop technologies:
 - **Tailwind CSS v4**: Utility-first CSS framework
 - **Shadcn/UI**: Component library for beautiful, accessible UI elements
 - **TypeScript**: Type-safe JavaScript
-- **Bun**: Javascript runtime, pkg manager, and development tooling
+- **pnpm with Node LTS**: Package manager and development tooling
 
 ## Getting Started
 
@@ -31,7 +31,7 @@ Syndeos is built using modern web and desktop technologies:
 
 Before installing Syndeos, ensure you have the following installed:
 
-- [Bun.js](https://bun.sh/) (v1.2 or later) (No Node or NPM)
+- [Node.js](https://nodejs.org/) (LTS version) with [pnpm](https://pnpm.io/)
 - [Rust](https://www.rust-lang.org/tools/install) (latest stable)
 - Platform-specific dependencies for Tauri development:
   - **Windows**: Visual Studio C++ Build Tools
@@ -48,12 +48,12 @@ Before installing Syndeos, ensure you have the following installed:
 
 2. Install dependencies:
    ```bash
-   bun install
+   pnpm install
    ```
 
 3. Build the application:
    ```bash
-   bun run tauri build
+   pnpm tauri build
    ```
 
 4. The built application will be available in the `src-tauri/target/release` directory.
@@ -62,12 +62,12 @@ Before installing Syndeos, ensure you have the following installed:
 
 1. Install dependencies:
    ```bash
-   bun install
+   pnpm install
    ```
 
 2. Start the development server:
    ```bash
-   bun run tauri dev
+   pnpm tauri dev
    ```
 
 ## Usage

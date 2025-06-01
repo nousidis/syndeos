@@ -1,21 +1,19 @@
 mod common;
 mod features;
 mod database;
-
 use tauri::AppHandle;
-use database::connection;
 
 #[tauri::command]
 fn init_app(app_handle: AppHandle) -> Result<String, String> {
-    let db_result = connection::init_database(app_handle.clone())?;
+    let db_result = database::initialize(app_handle.clone())?;
 
     println!("Tauri SQLite Database Initialization Successful!");
 
-    features::setting::init_default_settings(app_handle.clone())?;
+    let _ = features::setting::init_default_settings(app_handle.clone())?;
 
     println!("Tauri Settings Initialization Successful!");
 
-    features::ssh_key::init_ssh_keys(app_handle.clone())?;
+    let _ = features::ssh_key::init_ssh_keys(app_handle.clone())?;
 
     println!("Tauri SSH Keys Initialization Successful!");
 
@@ -34,7 +32,10 @@ pub fn run() {
             features::server::update_server,
             features::server::delete_server,
             features::server::get_servers,
-            features::server::update_settings,
+            features::server::try_connect_to_server,
+            features::server::connect_with_password,
+            features::server::disconnect_from_server,
+            features::server::run_cmd,
 
             features::ssh_key::add_ssh_key,
             features::ssh_key::delete_ssh_key,
