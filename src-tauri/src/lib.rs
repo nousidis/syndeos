@@ -35,7 +35,8 @@ pub fn run() {
             features::server::try_connect_to_server,
             features::server::connect_with_password,
             features::server::disconnect_from_server,
-            features::server::run_cmd,
+            features::server::test,
+            features::server::install_node,
 
             features::ssh_key::add_ssh_key,
             features::ssh_key::delete_ssh_key,

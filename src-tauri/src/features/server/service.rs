@@ -226,7 +226,7 @@ pub fn disconnect_from_server() -> Result<(), String> {
     }
 }
 
-pub fn run_cmd(command: &str) -> Result<String, String> {
+pub fn cmd(command: &str) -> Result<String, String> {
     let mut active_session_guard = ACTIVE_SESSION.lock().map_err(|_| "Failed to acquire session lock for command execution".to_string())?;
 
     if let Some(session) = active_session_guard.as_mut() {

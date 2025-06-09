@@ -71,6 +71,28 @@ pub fn disconnect_from_server() -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub fn run_cmd() -> Result<String, String> {
-    service::run_cmd("ls")
+pub fn test() -> Result<String, String> {
+    install_node(None)
+}
+
+#[tauri::command]
+pub fn install_node(version: Option<String>) -> Result<String, String> {
+    let pnpm_path = "~/.local/share/pnpm/pnpm";
+    
+    let result = service::cmd(&format!("{} --version", pnpm_path));
+
+    if result.is_err() {
+        service::cmd("curl -fsSL https://get.pnpm.io/install.sh | sh -")
+            .map_err(|e| format!("Failed to install pnpm: {}", e))?;
+    }
+    
+    println!("{:?}", result);
+
+    let default_node_version = version.unwrap_or_else(|| "lts".to_string());
+    
+    service::cmd(&format!("{} env use -g {}", pnpm_path, default_node_version))
+        .map_err(|e| format!("Failed to install Node.js {}: {}", default_node_version, e))?;
+
+    service::cmd("node --version")
+        .map_err(|e| format!("Node.js installation verification failed: {}", e))
 }

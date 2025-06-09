@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import { ConnectButton } from './connect-button';
+import { toast } from 'sonner';
 
 export default function ServerPage() {
     const { connectionStatus, connectedServer } = useServerContext();
@@ -97,14 +98,17 @@ export default function ServerPage() {
                                 <Button
                                     onClick={async () => {
                                         try {
-                                            const result = await invoke('run_cmd') as string;
+                                            const result = await invoke('test') as string;
+
+                                            toast.success(result);
+
                                             console.log(result);
                                         } catch (e) {
                                             console.log(e as string);
                                         }
                                     }}
                                 >
-                                   Run Command
+                                   Run Test
                                 </Button>
                             </div>
                         </div>
