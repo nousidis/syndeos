@@ -27,6 +27,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             init_app,
 
+            // Server management commands
             features::server::add_server,
             features::server::get_server,
             features::server::update_server,
@@ -36,8 +37,36 @@ pub fn run() {
             features::server::connect_with_password,
             features::server::disconnect_from_server,
             features::server::test,
-            features::server::install_node,
 
+            // PHP version management commands
+            features::server::install_php_version,
+            features::server::remove_php_version,
+            features::server::list_php_versions,
+            features::server::set_default_php_version,
+
+            // Node.js version management commands
+            features::server::install_node_version,
+            features::server::remove_node_version,
+            features::server::list_node_versions,
+            features::server::set_default_node_version,
+
+            // Application management commands
+            features::server::create_application,
+            features::server::remove_application,
+            features::server::list_applications,
+            features::server::enable_application,
+            features::server::disable_application,
+
+            // User management commands
+            features::server::create_user,
+            features::server::remove_user,
+            features::server::list_users,
+            features::server::change_user_password,
+
+            // Server initial setup command
+            features::server::setup_server,
+
+            // SSH key management commands
             features::ssh_key::add_ssh_key,
             features::ssh_key::delete_ssh_key,
             features::ssh_key::get_ssh_key,
@@ -45,10 +74,11 @@ pub fn run() {
             features::ssh_key::set_default_ssh_key,
             features::ssh_key::generate_ssh_key,
 
+            // Settings management commands
             features::setting::get_setting,
             features::setting::get_settings,
-            features::setting::update_setting, 
-            features::setting::reset_app, 
+            features::setting::update_setting,
+            features::setting::reset_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
