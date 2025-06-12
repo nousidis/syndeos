@@ -52,12 +52,14 @@ export function AppSidebar({...props}: React.ComponentProps<typeof Sidebar>) {
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             asChild
-                            className="data-[slot=sidebar-menu-button]:!py-7"
+                            className="data-[slot=sidebar-menu-button]:!py-8 hover:bg-none"
                         >
-                            <a href="#" className="flex justify-items-start gap-4">
-                                <img src="/icon.svg" alt="Syndeos Logo" className="size-14 rounded-4xl" />
-                                <span className="text-2xl font-light">Syndeos</span>
-                            </a>
+                            <div className="flex justify-items-start gap-4">
+                                <img src="/icon.svg" alt="Syndeos Logo" className="size-14 rounded-xl" />
+                                <div className="flex flex-col">
+                                    <span className="text-2xl font-bold">Syndeos</span>
+                                </div>
+                            </div>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>

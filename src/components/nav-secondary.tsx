@@ -52,6 +52,9 @@ export function NavSecondary({items, ...props}: {
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     ))}
+                    <SidebarMenuItem className="flex justify-items-end items-end">
+                        <p className="text-muted-foreground font-semibold">v1.2.3</p>
+                    </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarGroupContent>
         </SidebarGroup>
